@@ -16,6 +16,9 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 
+#define SERVER_SEQ 114
+#define CLIENT_SEQ 514
+
 // 单位是byte
 #define SIZE32 4
 #define SIZE16 2

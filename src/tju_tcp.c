@@ -27,7 +27,7 @@ tju_tcp_t* tju_socket(){
 
     sock->window.wnd_send = NULL;
     sock->window.wnd_recv = NULL;
-
+    sock->window.wnd_send->nextseq = 1;
     return sock;
 }
 
@@ -201,7 +201,60 @@ int tju_handle_packet(tju_tcp_t* sock, char* pkt){
              sendToLayer3(msg,DEFAULT_HEADER_LEN);
          }
     }
+    if(sock->state == ESTABLISHED){
+        if (flag == FIN_ACK_FLAG_MASK){
+            uint32_t sseq = sock->window.wnd_send->nextseq;
+            uint32_t ack = seq + 1;
+            char *msg = create_packet_buf(sock->established_local_addr.port, sock->established_remote_addr.port, sseq, ack,
+                                           DEFAULT_HEADER_LEN, DEFAULT_HEADER_LEN, ACK_FLAG_MASK, 1, 0, NULL, 0);
+            sendToLayer3(msg, DEFAULT_HEADER_LEN);
+            sock->state = CLOSE_WAIT;
+            sleep(1);
+            tju_close(sock);
+        }
+    }
     
+    if (sock->state == FIN_WAIT_1){
+        if (flag == ACK_FLAG_MASK){
+            sock->state = FIN_WAIT_2;
+        }
+
+        if (flag == FIN_ACK_FLAG_MASK){
+            // 向客户端发送ACK
+            uint32_t sseq = sock->window.wnd_send->nextseq + 1;
+            uint32_t aack = sseq + 1;
+            char *msg = create_packet_buf(sock->established_local_addr.port, sock->established_remote_addr.port, sseq, aack,
+                                           DEFAULT_HEADER_LEN, DEFAULT_HEADER_LEN, ACK_FLAG_MASK, 1, 0, NULL, 0);
+            sendToLayer3(msg, DEFAULT_HEADER_LEN);
+            sock->state = CLOSING;
+        }
+    }
+
+    if (sock->state == FIN_WAIT_2){
+        if (flag == FIN_ACK_FLAG_MASK){
+            uint32_t sseq = ack;
+            uint32_t aack = seq + 1;
+            char *msg = create_packet_buf(sock->established_local_addr.port, sock->established_remote_addr.port,
+                                          sseq, aack, DEFAULT_HEADER_LEN, DEFAULT_HEADER_LEN, ACK_FLAG_MASK, 1, 0, NULL, 0);
+            sendToLayer3(msg, DEFAULT_HEADER_LEN);
+            sleep(1);
+            sock->state = CLOSED;
+        }
+    }
+
+    if (sock->state == LAST_ACK){
+        if (flag == FIN_ACK_FLAG_MASK){
+            sock->state = CLOSED;
+        }
+    }
+
+    if (sock->state == CLOSING){
+        if (flag == ACK_FLAG_MASK){
+            sleep(1);
+            sock->state = CLOSED;
+        }
+    }
+
     if(sock->received_buf == NULL){
         sock->received_buf = malloc(data_len);
     }else {
@@ -212,10 +265,22 @@ int tju_handle_packet(tju_tcp_t* sock, char* pkt){
 
     pthread_mutex_unlock(&(sock->recv_lock)); // 解锁
 
-
     return 0;
 }
 
 int tju_close (tju_tcp_t* sock){
+    uint32_t seq = sock->window.wnd_send->nextseq;
+    char *msg = create_packet_buf(sock->established_local_addr.port, sock->established_remote_addr.port, seq, 0,
+                                  DEFAULT_HEADER_LEN, DEFAULT_HEADER_LEN, FIN_ACK_FLAG_MASK, 1, 0, NULL, 0);
+    sendToLayer3(msg, DEFAULT_HEADER_LEN);
+    if (sock->state == ESTABLISHED){
+        sock->state = FIN_WAIT_1;
+    }
+    else if (sock->state == CLOSE_WAIT){
+        sock->state = LAST_ACK;
+    }
+    // 等待四次挥手完成
+    while (sock->state != CLOSED){}
+    sock = NULL;
     return 0;
 }

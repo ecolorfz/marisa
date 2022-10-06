@@ -18,6 +18,7 @@
 #define SYN_FLAG_MASK 0x8
 #define ACK_FLAG_MASK 0x4
 #define FIN_FLAG_MASK 0x2
+#define FIN_ACK_FLAG_MASK 0x6
 
 // TCP 报文 header部分 的结构定义
 typedef struct {

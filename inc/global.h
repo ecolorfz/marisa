@@ -16,6 +16,11 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 
+//RTT CALCULATION
+#define RTT_ALPHA 0.125
+#define RTT_BETA 0.25
+#define INIT_RTT 0.5
+
 #define SERVER_SEQ 114
 #define CLIENT_SEQ 514
 
@@ -61,17 +66,17 @@
 typedef struct {
 	uint16_t window_size;
 
-//   uint32_t base;
-//   uint32_t nextseq;
-//   uint32_t estmated_rtt;
-//   int ack_cnt;
-//   pthread_mutex_t ack_cnt_lock;
-//   struct timeval send_time;
-//   struct timeval timeout;
-//   uint16_t rwnd; 
-//   int congestion_status;
-//   uint16_t cwnd; 
-//   uint16_t ssthresh; 
+  uint32_t base;
+  uint32_t nextseq;
+  uint32_t estmated_rtt;
+  int ack_cnt;
+  pthread_mutex_t ack_cnt_lock;
+  struct timeval send_time;
+  struct timeval timeout;
+  uint16_t rwnd; 
+  int congestion_status;
+  uint16_t cwnd; 
+  uint16_t ssthresh; 
 } sender_window_t;
 
 // TCP 接受窗口
@@ -79,10 +84,10 @@ typedef struct {
 typedef struct {
 	char received[TCP_RECVWN_SIZE];
 
-//   received_packet_t* head;
-//   char buf[TCP_RECVWN_SIZE];
-//   uint8_t marked[TCP_RECVWN_SIZE];
-//   uint32_t expect_seq;
+  //received_packet_t* head;
+  char buf[TCP_RECVWN_SIZE];
+  uint8_t marked[TCP_RECVWN_SIZE];
+  uint32_t expect_seq;
 } receiver_window_t;
 
 // TCP 窗口 每个建立了连接的TCP都包括发送和接受两个窗口
